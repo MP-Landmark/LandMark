@@ -1,3 +1,4 @@
+```
 com.lendmark
  ├─ LendMarkApp.kt                 // Application (필요 시)
  ├─ navigation/
@@ -80,3 +81,4 @@ com.lendmark
  │   ├─ Resource.kt / Result.kt
  │   └─ Logger.kt
  └─ di/                                 // Hilt 쓸 경우
+```
