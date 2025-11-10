@@ -107,6 +107,41 @@ class MainActivity : AppCompatActivity() {
             .set(schedule)
 
 
+        // 4. Users (sample)
+        val users = listOf(
+            mapOf(
+                "id" to "phy9558",
+                "email" to "phy9558@gmail.com",
+                "nickname" to "유영",
+                "createdAt" to FieldValue.serverTimestamp()
+            ),
+            mapOf(
+                "id" to "testuser",
+                "email" to "testuser@example.com",
+                "nickname" to "테스터",
+                "createdAt" to FieldValue.serverTimestamp()
+            )
+        )
+
+        for (user in users) {
+            val userId = user["id"] as String
+            db.collection("users").document(userId).set(user)
+
+            // 기본 즐겨찾기 샘플
+            val favorite = mapOf(
+                "buildingId" to "dasan",
+                "roomId" to "dasan-107",
+                "createdAt" to FieldValue.serverTimestamp()
+            )
+            db.collection("users").document(userId)
+                .collection("favorites").add(favorite)
+        }
+
+        Log.d("FirebaseSeed", "Initial Data Upload successfully")
+
+
+
+
 
     }
 
