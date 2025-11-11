@@ -3,6 +3,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="gray">#808080</color>
+    <color name="red">#E53935</color>
 
     <!-- Navigation Colors -->
     <color name="nav_selected">#190848</color>
@@ -12,7 +13,16 @@
     <color name="colorPrimary">#190848</color>
     <color name="colorPrimaryDark">#140638</color>
     <color name="colorAccent">#F06292</color>
+    <color name="purple_500">#6200EE</color>
     <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#03DAC5</color>
+    <color name="teal_700">#018786</color>
+
+    <!-- Status & Semantic Colors -->
+    <color name="green">#00C950</color>
+    <color name="green_light">#E8F5E9</color>
+    <color name="yellow_dark">#F57F17</color>
+    <color name="status_gray">#ECEEF2</color>
 
     <!-- Background & Text Colors -->
     <color name="background_light">#F5F5F5</color>
