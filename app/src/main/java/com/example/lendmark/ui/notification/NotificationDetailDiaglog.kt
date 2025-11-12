@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import com.example.lendmark.databinding.DialogNotificationDetailBinding
+import com.example.lendmark.ui.my.Reservation // Import Reservation data class
+import com.example.lendmark.ui.my.ReservationDetailDialog // Import the target dialog
 
 class NotificationDetailDialog(
     private val item: NotificationItem
@@ -14,22 +16,42 @@ class NotificationDetailDialog(
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val binding = DialogNotificationDetailBinding.inflate(LayoutInflater.from(context))
 
-        // 제목, 내용 표시
+        // Set title and details
         binding.tvTitle.text = item.title
-        binding.tvDetail.text = item.detail
+        binding.tvDetail.text = "Reservation at: ${item.location} (${item.startTime} - ${item.endTime})"
 
-        // “예약 상세로 가기” 버튼 (아직 기능 미구현)
+        // Connect the "Go to Reservation Details" button
         binding.btnGoReservation.setOnClickListener {
-            // TODO: 예약 상세 페이지로 이동 (추후 구현)
+            // Dismiss the current simple dialog
             dismiss()
+
+            // Create a temporary Reservation object from the NotificationItem's data
+            val reservationData = Reservation(
+                id = item.id,
+                building = item.location.split(" ").firstOrNull() ?: item.location, // Simple name extraction
+                room = item.location,
+                date = item.date,
+                time = "${item.startTime} - ${item.endTime}",
+                attendees = 0, // This info isn't in the notification
+                purpose = "(Details in My Reservations)", // This info isn't in the notification
+                status = "Approved", // Assume a status to show the correct buttons
+                isCancelled = false
+            )
+
+            // Create and show the detailed dialog, passing a lambda for the cancel click
+            val detailDialog = ReservationDetailDialog(reservationData) { reservationId ->
+                // This callback would be handled by the parent fragment if needed
+                // For now, we just define it to satisfy the constructor
+            }
+            detailDialog.show(parentFragmentManager, "ReservationDetailDialog")
         }
 
-        // 확인 버튼
+        // OK button
         binding.btnConfirm.setOnClickListener {
             dismiss()
         }
 
-        // Dialog 스타일 적용
+        // Apply dialog style
         return AlertDialog.Builder(requireContext())
             .setView(binding.root)
             .create()
