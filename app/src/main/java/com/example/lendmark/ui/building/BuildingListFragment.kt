@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -33,7 +34,8 @@ class BuildingListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = BuildingListAdapter(buildingList) { building ->
+        adapter = BuildingListAdapter(requireActivity() as AppCompatActivity, buildingList) { building ->
+            // 기존 네비게이션 이동
             val bundle = Bundle().apply {
                 putString("buildingName", building.name)
                 putInt("buildingCode", building.code)
