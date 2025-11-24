@@ -34,6 +34,8 @@ class MyPageFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        refreshProfileCard()
+
         val toggleGroup =
             view.findViewById<MaterialButtonToggleGroup>(R.id.my_toggle_group)
         val btnInfo = view.findViewById<MaterialButton>(R.id.btn_my_info)
@@ -91,6 +93,7 @@ class MyPageFragment : Fragment() {
                 if (isAdded) { // Ensure fragment is still attached
                     EditProfileDialog(majorsList) {
                         refreshMyInfo()
+                        refreshProfileCard()
                     }.show(childFragmentManager, "EditProfileDialog")
                 }
             }
@@ -104,5 +107,20 @@ class MyPageFragment : Fragment() {
             .replace(R.id.my_content_container, MyInfoFragment())
             .commit()
     }
+
+    private fun refreshProfileCard() {
+        val uid = auth.currentUser?.uid ?: return
+
+        db.collection("users").document(uid)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (!isAdded || _binding == null) return@addOnSuccessListener
+
+                binding.tvUserName.text = doc.getString("name") ?: ""
+                binding.tvUserMajor.text = doc.getString("department") ?: ""
+                binding.tvUserEmail.text = doc.getString("email") ?: ""
+            }
+    }
+
 
 }
