@@ -326,6 +326,7 @@ class RoomScheduleFragment : Fragment() {
             .setView(dialogView)
             .create()
 
+
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         val etUserName = dialogView.findViewById<EditText>(R.id.etUserName)
@@ -335,6 +336,22 @@ class RoomScheduleFragment : Fragment() {
         val etPurposeCustom = dialogView.findViewById<EditText>(R.id.etPurposeCustom)   // ★★ 반드시 추가
         val btnSubmit = dialogView.findViewById<Button>(R.id.btnSubmit)
         val btnCancel = dialogView.findViewById<Button>(R.id.btnCancel)
+
+        // 현재 로그인한 사용자 정보 불러오기
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+
+        if (uid != null) {
+            db.collection("users").document(uid).get()
+                .addOnSuccessListener { document ->
+                    if (document != null) {
+                        val name = document.getString("name") ?: ""
+                        val major = document.getString("department") ?: ""   // << 여기 수정!
+
+                        etUserName.setText(name)
+                        etMajor.setText(major)
+                    }
+                }
+        }
 
         // ----------- 목적 드롭다운 -----------
         val items = listOf("스터디", "발표 준비", "미팅", "기타 (직접 입력)")
