@@ -23,7 +23,7 @@ class ReservationDetailDialogFS(
         val binding = DialogReservationDetailBinding.inflate(LayoutInflater.from(context))
 
         // ──────────────────────────────────────────
-        // 🔥 1) Firestore 값 UI 표시
+        // 1) Firestore 값 UI 표시
         // ──────────────────────────────────────────
         binding.tvBuildingName.text = reservation.buildingId
         binding.tvRoomName.text = reservation.roomId
@@ -33,7 +33,7 @@ class ReservationDetailDialogFS(
         binding.tvPurpose.text = reservation.purpose
 
         // ──────────────────────────────────────────
-        // 🔥 2) 닫기 버튼
+        // 2) 닫기 버튼
         // ──────────────────────────────────────────
         binding.btnClose.setOnClickListener { dismiss() }
 
@@ -41,7 +41,7 @@ class ReservationDetailDialogFS(
         // 🔥 3) 상태별 버튼 표시
         // approved  → 취소 버튼
         // finished  → 정보등록 버튼
-        // canceled  → 취소됨 표시
+        // canceled  → 버튼 없음
         // ──────────────────────────────────────────
         when (reservation.status) {
 
@@ -78,12 +78,7 @@ class ReservationDetailDialogFS(
 
             "canceled" -> {
                 binding.btnRegisterInfo.visibility = View.GONE
-                binding.btnCancel.visibility = View.VISIBLE
-
-                binding.btnCancel.text = "Cancelled"
-                binding.btnCancel.isEnabled = false
-                binding.btnCancel.setTextColor(ContextCompat.getColor(requireContext(), R.color.gray))
-                binding.btnCancel.strokeColor = ContextCompat.getColorStateList(requireContext(), R.color.gray)
+                binding.btnCancel.visibility = View.GONE
             }
         }
 

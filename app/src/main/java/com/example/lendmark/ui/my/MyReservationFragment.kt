@@ -1,14 +1,15 @@
 package com.example.lendmark.ui.my
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.example.lendmark.R
-import com.example.lendmark.data.model.Building
 import com.example.lendmark.databinding.FragmentMyReservationBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -23,7 +24,6 @@ class MyReservationFragment : Fragment() {
     private val db = FirebaseFirestore.getInstance()
     private val uid = FirebaseAuth.getInstance().currentUser?.uid
 
-    // Firestore에서 받아온 예약들 저장
     private var reservationList: List<ReservationFS> = emptyList()
 
     override fun onCreateView(
@@ -38,16 +38,12 @@ class MyReservationFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 필터 초기값
         binding.filterGroup.check(R.id.filterAll)
-        binding.filterGroup.setOnCheckedChangeListener { _, _ ->
-            displayReservations()
-        }
+        binding.filterGroup.setOnCheckedChangeListener { _, _ -> displayReservations() }
 
         loadReservations()
     }
 
-    /** Firestore에서 예약 정보 불러오기 */
     private fun loadReservations() {
         if (uid == null) return
 
@@ -68,7 +64,7 @@ class MyReservationFragment : Fragment() {
                         purpose = doc.getString("purpose") ?: "",
                         status = doc.getString("status") ?: "approved"
                     )
-                }
+                }.sortedByDescending { it.date } // 날짜 최신순으로 정렬
 
                 displayReservations()
             }
@@ -77,16 +73,12 @@ class MyReservationFragment : Fragment() {
             }
     }
 
-    /** 상태 필터 후 카드 그리기 */
     private fun displayReservations() {
         val container = binding.reservationContainer
         container.removeAllViews()
 
         val inflater = LayoutInflater.from(requireContext())
-
-        val filterId = binding.filterGroup.checkedChipId
-
-        val filtered = when (filterId) {
+        val filtered = when (binding.filterGroup.checkedChipId) {
             R.id.filterApproved -> reservationList.filter { it.status == "approved" }
             R.id.filterFinished -> reservationList.filter { it.status == "finished" || it.status == "canceled" }
             else -> reservationList
@@ -105,66 +97,86 @@ class MyReservationFragment : Fragment() {
             val tvDateTime = card.findViewById<TextView>(R.id.tvDateTime)
             val tvAttendees = card.findViewById<TextView>(R.id.tvAttendees)
             val tvPurpose = card.findViewById<TextView>(R.id.tvPurpose)
-
             val btnCancel = card.findViewById<MaterialButton>(R.id.btnCancel)
             val btnRegisterInfo = card.findViewById<MaterialButton>(R.id.btnRegisterInfo)
 
-            // UI 매핑
             tvBuildingRoom.text = "${reservation.buildingId} ${reservation.roomId}"
             tvDateTime.text = "${reservation.date} • ${periodToTime(reservation.periodStart)} - ${periodToTime(reservation.periodEnd)}"
             tvAttendees.text = "Attendees: ${reservation.attendees}"
             tvPurpose.text = "Purpose: ${reservation.purpose}"
             tvStatus.text = reservation.status.replaceFirstChar { it.uppercase() }
 
-            // 상태별 버튼 처리
+            resetCardToDefault(card)
+
             when (reservation.status) {
                 "approved" -> {
-                    btnRegisterInfo.visibility = View.GONE
+                    tvStatus.setTextColor(Color.WHITE)
+                    tvStatus.background = ContextCompat.getDrawable(requireContext(), R.drawable.bg_status_green)
                     btnCancel.visibility = View.VISIBLE
                 }
                 "finished" -> {
-                    btnCancel.visibility = View.GONE
+                    tvStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary))
+                    tvStatus.background = ContextCompat.getDrawable(requireContext(), R.drawable.bg_status_gray)
                     btnRegisterInfo.visibility = View.VISIBLE
                 }
                 "canceled" -> {
-                    btnCancel.visibility = View.VISIBLE
-                    btnCancel.isEnabled = false
-                    btnCancel.text = "Cancelled"
+                    tvStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary))
+                    tvStatus.background = ContextCompat.getDrawable(requireContext(), R.drawable.bg_status_gray)
+                    setCardToCanceledState(card)
                 }
             }
 
-            // 상세보기 다이얼로그 연결
             card.setOnClickListener {
                 ReservationDetailDialogFS(
                     reservation = reservation,
-                    onCancelClick = { updateStatus(reservation.id, "canceled") },
-                    onRegisterClick = { updateStatus(reservation.id, "finished") }
+                    onCancelClick = { 
+                        ConfirmCancelDialog {
+                            updateStatus(reservation.id, "canceled")
+                        }.show(childFragmentManager, "ConfirmCancelDialog")
+                    },
+                    onRegisterClick = { 
+                        // This is a placeholder. The actual registration happens in btnRegisterInfo's listener.
+                    }
                 ).show(childFragmentManager, "ReservationDetailDialogFS")
             }
 
-            // 취소 버튼
-            btnCancel.setOnClickListener {
-                updateStatus(reservation.id, "canceled")
+            btnCancel.setOnClickListener { 
+                ConfirmCancelDialog {
+                    updateStatus(reservation.id, "canceled")
+                }.show(parentFragmentManager, "ConfirmCancelDialog")
             }
-
-            // 정보 등록 버튼
             btnRegisterInfo.setOnClickListener {
-                updateStatus(reservation.id, "finished")
+                val dialog = RegisterInfoDialog { features ->
+                    updateRoomFeatures(reservation.buildingId, reservation.roomId, features)
+                }
+                dialog.show(parentFragmentManager, "RegisterInfoDialog")
             }
 
             container.addView(card)
         }
     }
 
-    /** Firestore status 업데이트 */
     private fun updateStatus(id: String, newStatus: String) {
         db.collection("reservations").document(id)
             .update("status", newStatus)
+            .addOnSuccessListener { loadReservations() }
+            .addOnFailureListener { Toast.makeText(requireContext(), "Failed to update status", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun updateRoomFeatures(buildingId: String, roomId: String, features: List<String>) {
+        if (buildingId.isEmpty() || roomId.isEmpty()) {
+            Toast.makeText(requireContext(), "Cannot register info: Invalid reservation data.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        db.collection("buildings").document(buildingId)
+            .collection("rooms").document(roomId)
+            .update("features", features)
             .addOnSuccessListener {
-                loadReservations()
+                Toast.makeText(requireContext(), "Classroom info registered successfully!", Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Failed to update status", Toast.LENGTH_SHORT).show()
+            .addOnFailureListener { e ->
+                Toast.makeText(requireContext(), "Failed to register info: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
 
@@ -172,7 +184,7 @@ class MyReservationFragment : Fragment() {
         val tv = TextView(requireContext()).apply {
             text = "No reservations found."
             setPadding(16, 32, 16, 32)
-            setTextColor(requireContext().getColor(R.color.gray_dark))
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.gray_dark))
         }
         container.addView(tv)
     }
@@ -180,6 +192,28 @@ class MyReservationFragment : Fragment() {
     private fun periodToTime(period: Int): String {
         val hour = 8 + period
         return String.format("%02d:00", hour)
+    }
+
+    private fun resetCardToDefault(card: View) {
+        card.isClickable = true
+        card.findViewById<TextView>(R.id.tvBuildingRoom).setTextColor(ContextCompat.getColor(requireContext(), R.color.black))
+        card.findViewById<TextView>(R.id.tvDateTime).setTextColor(ContextCompat.getColor(requireContext(), R.color.gray_dark))
+        card.findViewById<TextView>(R.id.tvAttendees).setTextColor(ContextCompat.getColor(requireContext(), R.color.gray_dark))
+        card.findViewById<TextView>(R.id.tvPurpose).setTextColor(ContextCompat.getColor(requireContext(), R.color.gray_dark))
+
+        card.findViewById<MaterialButton>(R.id.btnCancel).visibility = View.GONE
+        card.findViewById<MaterialButton>(R.id.btnRegisterInfo).visibility = View.GONE
+    }
+
+    private fun setCardToCanceledState(card: View) {
+        val grayColor = ContextCompat.getColor(requireContext(), R.color.gray)
+        card.findViewById<TextView>(R.id.tvBuildingRoom).setTextColor(grayColor)
+        card.findViewById<TextView>(R.id.tvDateTime).setTextColor(grayColor)
+        card.findViewById<TextView>(R.id.tvAttendees).setTextColor(grayColor)
+        card.findViewById<TextView>(R.id.tvPurpose).setTextColor(grayColor)
+
+        card.findViewById<MaterialButton>(R.id.btnCancel).visibility = View.GONE
+        card.findViewById<MaterialButton>(R.id.btnRegisterInfo).visibility = View.GONE
     }
 
     override fun onDestroyView() {
