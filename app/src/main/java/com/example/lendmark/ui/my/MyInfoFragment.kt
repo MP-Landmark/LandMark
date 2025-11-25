@@ -13,7 +13,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 class MyInfoFragment : Fragment() {
 
     private var _binding: FragmentMyInfoBinding? = null
-    private val binding get() = _binding
+    private val binding get() = _binding!!
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
@@ -23,7 +23,7 @@ class MyInfoFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentMyInfoBinding.inflate(inflater, container, false)
-        return _binding!!.root
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -32,39 +32,42 @@ class MyInfoFragment : Fragment() {
     }
 
     private fun loadUserInfo() {
-        val user = auth.currentUser ?: return
-        val uid = user.uid
+        val uid = auth.currentUser?.uid ?: return
 
+        // 1. 사용자 기본 정보 불러오기
         db.collection("users").document(uid).get()
             .addOnSuccessListener { document ->
+                if (!isAdded) return@addOnSuccessListener
 
-                if (!isAdded || _binding == null) return@addOnSuccessListener
-
-                if (document != null) {
-                    binding?.valueName?.text = document.getString("name")
-                    binding?.valueMajor?.text = document.getString("department")
-                    binding?.valueEmail?.text = document.getString("email")
-                    binding?.valuePhone?.text = document.getString("phone")
-
-                    // 예약 컬렉션 읽기
-                    db.collection("users").document(uid)
-                        .collection("reservations").get()
-                        .addOnSuccessListener { reservations ->
-
-                            if (!isAdded || _binding == null) return@addOnSuccessListener
-
-                            binding?.valueTotalReservation?.text = "${reservations.size()}회"
-                        }
-                        .addOnFailureListener { exception ->
-                            if (!isAdded || _binding == null) return@addOnFailureListener
-
-                            Log.d("MyInfoFragment", "Error getting reservations: ", exception)
-                            binding?.valueTotalReservation?.text = "0회"
-                        }
+                document?.let {
+                    binding.valueName.text = it.getString("name")
+                    binding.valueMajor.text = it.getString("department")
+                    binding.valueEmail.text = it.getString("email")
+                    binding.valuePhone.text = it.getString("phone")
                 }
             }
             .addOnFailureListener { exception ->
-                Log.d("MyInfoFragment", "get failed with ", exception)
+                Log.d("MyInfoFragment", "Failed to load user info", exception)
+            }
+
+        // 2. 총 예약 횟수 불러오기 (취소된 예약 제외)
+        db.collection("reservations")
+            .whereEqualTo("userId", uid)
+            .get()
+            .addOnSuccessListener { reservationsSnapshot ->
+                if (!isAdded) return@addOnSuccessListener
+                
+                // 클라이언트에서 "canceled" 상태 필터링
+                val validReservations = reservationsSnapshot.documents.filter {
+                    it.getString("status") != "canceled"
+                }
+                
+                binding.valueTotalReservation.text = "${validReservations.size}회"
+            }
+            .addOnFailureListener { exception ->
+                if (!isAdded) return@addOnFailureListener
+                Log.e("MyInfoFragment", "Error getting reservation count", exception)
+                binding.valueTotalReservation.text = "0회"
             }
     }
 
