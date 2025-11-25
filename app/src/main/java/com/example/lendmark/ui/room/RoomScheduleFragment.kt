@@ -866,37 +866,66 @@ class RoomScheduleFragment : Fragment() {
             return
         }
 
-        val dayKey = dayKeys[range.day]
         val date = weekDates[range.day]
         val dateString = getDateString(date)
+        val dayKey = dayKeys[range.day]
 
-        val reservation = hashMapOf(
-            "userId" to uid,
-            "userName" to userName,
-            "major" to major,
-            "people" to people,
-            "purpose" to purpose,
-            "roomId" to roomId,
-            "buildingId" to buildingId,
-            "day" to dayKey,
-            "date" to dateString,
-            "periodStart" to range.start,
-            "periodEnd" to range.end,
-            "timestamp" to System.currentTimeMillis(),
-            "status" to "approved"   // 바로 승인
-        )
-
+        // 1) Firestore에서 시간 겹치는 예약 있는지 1차 검사
         db.collection("reservations")
-            .add(reservation)
-            .addOnSuccessListener {
-                applyReservationToTable(range.day, range.start, range.end)
-                showReservationSuccessDialog()
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "예약 저장 실패", Toast.LENGTH_SHORT).show()
-            }
+            .whereEqualTo("buildingId", buildingId)
+            .whereEqualTo("roomId", roomId)
+            .whereEqualTo("date", dateString)
+            .whereEqualTo("status", "approved")
+            .get()
+            .addOnSuccessListener { result ->
+                // 기존 예약들과 충돌 여부 검사
+                for (doc in result) {
+                    val existingStart = doc.getLong("periodStart")?.toInt() ?: continue
+                    val existingEnd = doc.getLong("periodEnd")?.toInt() ?: continue
 
+                    // 겹치는지 체크: (start ≤ end2 && start2 ≤ end)
+                    val isOverlap =
+                        existingStart <= range.end && range.start <= existingEnd
+
+                    if (isOverlap) {
+                        Toast.makeText(
+                            requireContext(),
+                            "⚠ 해당 시간대는 이미 예약되었습니다.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@addOnSuccessListener
+                    }
+                }
+
+                // 2) 충돌 없음 → 저장 가능
+                val reservation = hashMapOf(
+                    "userId" to uid,
+                    "userName" to userName,
+                    "major" to major,
+                    "people" to people,
+                    "purpose" to purpose,
+                    "roomId" to roomId,
+                    "buildingId" to buildingId,
+                    "day" to dayKey,
+                    "date" to dateString,
+                    "periodStart" to range.start,
+                    "periodEnd" to range.end,
+                    "timestamp" to System.currentTimeMillis(),
+                    "status" to "approved"
+                )
+
+                db.collection("reservations")
+                    .add(reservation)
+                    .addOnSuccessListener {
+                        applyReservationToTable(range.day, range.start, range.end)
+                        showReservationSuccessDialog()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(requireContext(), "예약 저장 실패", Toast.LENGTH_SHORT).show()
+                    }
+            }
     }
+
 
     // 예약 완료 후 시간표에 ‘예약됨’ 표시
     private fun applyReservationToTable(day: Int, start: Int, end: Int) {
