@@ -45,32 +45,35 @@
         android:background="@drawable/bg_profile_card"
         android:elevation="4dp">
 
-        <ImageView
-            android:id="@+id/ivProfileIcon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_myplaces"
-            app:tint="@color/white"
+        <!-- ★ 실제 프로필 이미지 자리 -->
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/ivUserProfile"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:src="@drawable/bg_dialog_round"
+            android:scaleType="centerCrop"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
 
+        <!-- User info -->
         <LinearLayout
             android:id="@+id/llUserInfo"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:layout_marginStart="16dp"
-            app:layout_constraintStart_toEndOf="@id/ivProfileIcon"
+            app:layout_constraintStart_toEndOf="@id/ivUserProfile"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent">
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btnEditProfile"
+            android:layout_weight="1">
 
             <TextView
                 android:id="@+id/tvUserName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="3dp"
-                android:text="Kim Seoul"
+                android:text="User Name"
                 android:textColor="@color/white"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -79,7 +82,7 @@
                 android:id="@+id/tvUserMajor"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ITM Major"
+                android:text="Major"
                 android:textColor="@color/white"
                 android:textSize="14sp" />
 
@@ -87,25 +90,25 @@
                 android:id="@+id/tvUserEmail"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="seoultech@seoultech.ac.kr"
+                android:text="email@email.com"
                 android:textColor="@color/white"
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Edit button -->
         <ImageButton
             android:id="@+id/btnEditProfile"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/edit_button"
-            app:layout_constraintBottom_toBottomOf="@id/llUserInfo"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@id/llUserInfo"
-            app:layout_constraintVertical_bias="0.0" />
+            app:layout_constraintBottom_toBottomOf="@id/llUserInfo" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Top Tabs (My Info / My Reservations / Favorites) -->
+    <!-- Top Tabs -->
     <com.google.android.material.button.MaterialButtonToggleGroup
         android:id="@+id/my_toggle_group"
         android:layout_width="match_parent"
@@ -126,7 +129,7 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_my_reservation"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="75dp"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="My Reservations"
@@ -136,7 +139,7 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_my_favorite"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="13dp"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Favorites"
@@ -144,7 +147,7 @@
             app:cornerRadius="20dp" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
-    <!-- Container for each tab's content -->
+    <!-- Tab Container -->
     <FrameLayout
         android:id="@+id/my_content_container"
         android:layout_width="match_parent"

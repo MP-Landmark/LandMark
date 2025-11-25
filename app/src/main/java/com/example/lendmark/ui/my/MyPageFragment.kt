@@ -2,13 +2,13 @@ package com.example.lendmark.ui.my
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
+import com.example.lendmark.R
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import com.example.lendmark.R
+import com.bumptech.glide.Glide
 import com.example.lendmark.databinding.FragmentMyPageBinding
 import com.example.lendmark.ui.auth.AuthActivity
 import com.google.android.material.button.MaterialButton
@@ -17,6 +17,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 class MyPageFragment : Fragment() {
+
     private var _binding: FragmentMyPageBinding? = null
     private val binding get() = _binding!!
     private val auth = FirebaseAuth.getInstance()
@@ -30,25 +31,21 @@ class MyPageFragment : Fragment() {
         return binding.root
     }
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         refreshProfileCard()
 
-        val toggleGroup =
-            view.findViewById<MaterialButtonToggleGroup>(R.id.my_toggle_group)
-        val btnInfo = view.findViewById<MaterialButton>(R.id.btn_my_info)
+        val toggleGroup = view.findViewById<MaterialButtonToggleGroup>(com.example.lendmark.R.id.my_toggle_group)
+        val btnInfo = view.findViewById<MaterialButton>(com.example.lendmark.R.id.btn_my_info)
 
-        // Set listener for the Edit Profile button
         binding.btnEditProfile.setOnClickListener {
             loadMajorsAndShowDialog()
         }
 
-        // 기본: 내 정보 탭
         if (savedInstanceState == null) {
             childFragmentManager.beginTransaction()
-                .replace(R.id.my_content_container, MyInfoFragment())
+                .replace(com.example.lendmark.R.id.my_content_container, MyInfoFragment())
                 .commit()
             toggleGroup.check(btnInfo.id)
         }
@@ -57,15 +54,15 @@ class MyPageFragment : Fragment() {
             if (!isChecked) return@addOnButtonCheckedListener
 
             val fragment = when (checkedId) {
-                R.id.btn_my_info -> MyInfoFragment()
-                R.id.btn_my_reservation -> MyReservationFragment()
-                R.id.btn_my_favorite -> MyFavoriteFragment()
+                com.example.lendmark.R.id.btn_my_info -> MyInfoFragment()
+                com.example.lendmark.R.id.btn_my_reservation -> MyReservationFragment()
+                com.example.lendmark.R.id.btn_my_favorite -> MyFavoriteFragment()
                 else -> null
             }
 
             fragment?.let {
                 childFragmentManager.beginTransaction()
-                    .replace(R.id.my_content_container, it)
+                    .replace(com.example.lendmark.R.id.my_content_container, it)
                     .commit()
             }
         }
@@ -74,11 +71,10 @@ class MyPageFragment : Fragment() {
             auth.signOut()
             Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show()
 
-            // 로그인 화면(AuthActivity)로 이동
             val intent = Intent(requireContext(), AuthActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
-            requireActivity().finish()  // 현재 액티비티 종료 (MainActivity 닫기)
+            requireActivity().finish()
         }
 
     }
@@ -90,21 +86,22 @@ class MyPageFragment : Fragment() {
             .get()
             .addOnSuccessListener { result ->
                 val majorsList = result.documents.mapNotNull { it.getString("department") }
-                if (isAdded) { // Ensure fragment is still attached
+
+                if (isAdded) {
                     EditProfileDialog(majorsList) {
-                        refreshMyInfo()
                         refreshProfileCard()
+                        refreshMyInfo()
                     }.show(childFragmentManager, "EditProfileDialog")
                 }
             }
-            .addOnFailureListener { e ->
-                Log.e("MyPageFragment", "Failed to load majors", e)
+            .addOnFailureListener {
                 Toast.makeText(requireContext(), "Failed to load majors list.", Toast.LENGTH_SHORT).show()
             }
     }
+
     private fun refreshMyInfo() {
         childFragmentManager.beginTransaction()
-            .replace(R.id.my_content_container, MyInfoFragment())
+            .replace(com.example.lendmark.R.id.my_content_container, MyInfoFragment())
             .commit()
     }
 
@@ -119,8 +116,21 @@ class MyPageFragment : Fragment() {
                 binding.tvUserName.text = doc.getString("name") ?: ""
                 binding.tvUserMajor.text = doc.getString("department") ?: ""
                 binding.tvUserEmail.text = doc.getString("email") ?: ""
+
+                val imageUrl = doc.getString("profileImageUrl")
+
+                if (!imageUrl.isNullOrEmpty()) {
+                    Glide.with(this)
+                        .load(imageUrl)
+                        .into(binding.ivUserProfile)
+                } else {
+                    binding.ivUserProfile.setImageResource(R.drawable.ic_default_profile)
+                }
             }
     }
 
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }

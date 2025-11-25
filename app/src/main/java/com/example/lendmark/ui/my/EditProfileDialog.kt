@@ -3,6 +3,7 @@ package com.example.lendmark.ui.my
 import android.app.Dialog
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -27,7 +28,6 @@ class EditProfileDialog(
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
-    // 갤러리 이미지 선택
     private val pickImageLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) uploadProfileImage(uri)
@@ -53,26 +53,22 @@ class EditProfileDialog(
 
     override fun onStart() {
         super.onStart()
-        // 다이얼로그의 너비를 화면 너비의 85%로 설정
         val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
         dialog?.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
-    /** 학과 드롭다운 */
     private fun setupMajorDropdown() {
         val adapter =
             ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, majors)
         binding.actvMajor.setAdapter(adapter)
     }
 
-    /** Firestore에서 기존 정보 불러오기 */
     private fun loadExistingProfile() {
         val uid = auth.currentUser?.uid ?: return
 
         db.collection("users").document(uid)
             .get()
             .addOnSuccessListener { doc ->
-
                 if (!isAdded || _binding == null) return@addOnSuccessListener
 
                 binding.tvEmail.text = doc.getString("email") ?: ""
@@ -87,7 +83,6 @@ class EditProfileDialog(
             }
     }
 
-    /** 갤러리 선택 메뉴 */
     private fun showImagePickerMenu() {
         val dialogBinding = DialogProfilePhotoOptionsBinding.inflate(LayoutInflater.from(requireContext()))
         val dialog = AlertDialog.Builder(requireContext())
@@ -112,28 +107,30 @@ class EditProfileDialog(
 
         dialog.show()
 
-        // 사진 선택 다이얼로그의 너비를 화면 너비의 85%로 설정
         val width = (resources.displayMetrics.widthPixels * 0.85).toInt()
         dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
-    /** Firebase Storage 업로드 */
     private fun uploadProfileImage(uri: Uri) {
         val uid = auth.currentUser?.uid ?: return
-        val storageRef = FirebaseStorage.getInstance().reference.child("profileImages/$uid.jpg")
+        val storageRef = FirebaseStorage.getInstance().reference
+            .child("profileImages/$uid/${System.currentTimeMillis()}.jpg")
 
         storageRef.putFile(uri)
             .addOnSuccessListener {
                 storageRef.downloadUrl.addOnSuccessListener { url ->
                     saveImageUrlToFirestore(url.toString())
+                }.addOnFailureListener { exception ->
+                    Toast.makeText(requireContext(), "Failed to get download URL.", Toast.LENGTH_SHORT).show()
+                    Log.e("EditProfileDialog", "Failed to get download URL", exception)
                 }
             }
-            .addOnFailureListener {
+            .addOnFailureListener { exception ->
                 Toast.makeText(requireContext(), "Upload failed.", Toast.LENGTH_SHORT).show()
+                Log.e("EditProfileDialog", "Image upload failed", exception)
             }
     }
 
-    /** 업로드된 URL을 Firestore에 저장 */
     private fun saveImageUrlToFirestore(url: String) {
         val uid = auth.currentUser?.uid ?: return
 
@@ -143,9 +140,12 @@ class EditProfileDialog(
                 Glide.with(this).load(url).into(binding.ivProfileImage)
                 onProfileUpdated?.invoke()
             }
+            .addOnFailureListener { exception ->
+                Toast.makeText(requireContext(), "Failed to save image URL.", Toast.LENGTH_SHORT).show()
+                Log.e("EditProfileDialog", "Failed to save image URL", exception)
+            }
     }
 
-    /** 프로필 사진 삭제 */
     private fun removeProfileImage() {
         val uid = auth.currentUser?.uid ?: return
 
@@ -157,7 +157,6 @@ class EditProfileDialog(
             }
     }
 
-    /** 학과 + 전화번호 Firestore 저장 */
     private fun saveProfile() {
         val uid = auth.currentUser?.uid ?: return
 
