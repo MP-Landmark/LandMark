@@ -1,20 +1,26 @@
+require("dotenv").config();
 const { onCall } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const OpenAI = require("openai").default;
 
 admin.initializeApp();
 
-// ======================================================
-//  Email Verification
-// ======================================================
+/* ======================================================
+   0. 공통 설정
+   ====================================================== */
 
-// 환경변수 가져오기
+const REGION = "asia-northeast3";   // 필요하면 "asia-northeast3"로 통일해서 변경
+
+/* ======================================================
+   1. Email Verification
+   ====================================================== */
+
 const gmailUser = process.env.GMAIL_USER;
 const gmailPass = process.env.GMAIL_PASS;
 
-// Gmail SMTP 설정
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -23,17 +29,18 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// 이메일 인증 코드 발송
-exports.sendVerificationCode = onCall(async (req) => {
-  const rawEmail = req.data?.email || "";
-  const email = rawEmail.trim().toLowerCase();
+/** 1-1. 인증코드 발송 */
+exports.sendVerificationCode = onCall({ region: REGION }, async (req) => {
+  const email = (req.data?.email || "").trim().toLowerCase();
   if (!email) throw new Error("Missing email");
 
-  const code = String(Math.floor(100000 + Math.random() * 900000)); // 6자리 코드
-  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10분
 
-  await admin.firestore().collection("email_verifications")
-    .doc(email).set({ code, expiresAt });
+  await admin.firestore()
+    .collection("email_verifications")
+    .doc(email)
+    .set({ code, expiresAt });
 
   await transporter.sendMail({
     from: `"LendMark" <${gmailUser}>`,
@@ -41,8 +48,8 @@ exports.sendVerificationCode = onCall(async (req) => {
     subject: "[LendMark] Email Authentication Code",
     html: `
       <div style="font-family:sans-serif;">
-        <h2>Welcome to the LendMark application!</h2>
-        <p>Please enter the authentication code below into the app:</p>
+        <h2>Welcome to LendMark!</h2>
+        <p>Please enter the authentication code below in the app:</p>
         <h1 style="letter-spacing:4px;">${code}</h1>
         <p>Valid time: 10 minutes</p>
       </div>
@@ -52,117 +59,111 @@ exports.sendVerificationCode = onCall(async (req) => {
   return { ok: true };
 });
 
-exports.verifyEmailCode = onCall(async (req) => {
-  const rawEmail = req.data?.email || "";
-  const email = rawEmail.trim().toLowerCase();
-  const code = String((req.data?.code || "").toString().trim());
+/** 1-2. 인증코드 검증 */
+exports.verifyEmailCode = onCall({ region: REGION }, async (req) => {
+  const email = (req.data?.email || "").trim().toLowerCase();
+  const code = (req.data?.code || "").toString().trim();
 
-  const snap = await admin.firestore().collection("email_verifications")
-    .doc(email).get();
+  const snap = await admin.firestore()
+    .collection("email_verifications")
+    .doc(email)
+    .get();
+
   if (!snap.exists) return { ok: false, reason: "NOT_FOUND" };
 
   const { code: saved, expiresAt } = snap.data();
 
-  console.log("verify", { email, inputCode: code, saved, expiresAt });
-
   if (Date.now() > expiresAt) return { ok: false, reason: "EXPIRED" };
-  if (saved !== code)         return { ok: false, reason: "INVALID" };
+  if (saved !== code) return { ok: false, reason: "INVALID" };
 
   await snap.ref.delete();
   return { ok: true };
 });
 
+/* ======================================================
+   2. 예약 상태 관리 (Scheduler)
+   ====================================================== */
 
- exports.finishPastReservations = onSchedule("every 30 minutes", async () => {
-   const now = new Date();
-   const db = admin.firestore();
+/** 2-1. 매 30분마다 지난 예약 finished 처리 */
+exports.finishPastReservations = onSchedule(
+  { schedule: "every 30 minutes", region: REGION },
+  async () => {
+    const db = admin.firestore();
+    const now = new Date();
 
-   // 오늘 날짜 (YYYY-MM-DD)
-   const yyyy = now.getFullYear();
-   const mm = String(now.getMonth() + 1).padStart(2, "0");
-   const dd = String(now.getDate()).padStart(2, "0");
-   const todayStr = `${yyyy}-${mm}-${dd}`;
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
 
-   console.log("Running finishPastReservations:", todayStr);
+    const snapshot = await db
+      .collection("reservations")
+      .where("status", "==", "approved")
+      .get();
 
-   // 1) 아직 approved 상태인 예약 전부 가져오기
-   const snapshot = await db.collection("reservations")
-     .where("status", "==", "approved")
-     .get();
+    if (snapshot.empty) {
+      logger.info("finishPastReservations: no approved reservations.");
+      return null;
+    }
 
-   if (snapshot.empty) {
-     console.log("No approved reservations found.");
-     return null;
-   }
+    const batch = db.batch();
 
-   const batch = db.batch();
+    snapshot.forEach((doc) => {
+      const r = doc.data();
+      const dateStr = r.date; // "YYYY-MM-DD"
+      const periodEnd = r.periodEnd; // 예: 0,1,2...
 
-   snapshot.forEach(doc => {
-     const data = doc.data();
-     const dateStr = data.date; // yyyy-MM-dd
-     const periodEnd = data.periodEnd; // integer (e.g., 1 = 09:00~10:00)
-     const reservationDay = new Date(dateStr);
+      const endHour = 8 + (periodEnd + 1); // 8시 + (끝교시+1)
+      const nowHour = now.getHours();
 
-     // → 종료 시간 = 오전 8시 기준 periodEnd + 1
-     const endHour = 8 + (periodEnd + 1);
+      if (dateStr < todayStr) {
+        batch.update(doc.ref, { status: "finished" });
+      } else if (dateStr === todayStr && nowHour >= endHour) {
+        batch.update(doc.ref, { status: "finished" });
+      }
+    });
 
-     // ============ 1) 날짜가 오늘 이전이면 finished ============
-     if (dateStr < todayStr) {
-       batch.update(doc.ref, { status: "finished" });
-       return;
-     }
-
-     // 날짜가 오늘 이후이면 아직 finished 아니므로 return
-     if (dateStr > todayStr) return;
-
-     // ============ 2) 날짜가 오늘과 같으면 시간 비교 ============
-     const nowHour = now.getHours();
-
-     if (nowHour >= endHour) {
-       batch.update(doc.ref, { status: "finished" });
-     }
-   });
-
-   await batch.commit();
-   console.log("finishPastReservations completed.");
-   return null;
- });
-
-
-/* ============================================================
-   2) 매일 실행 → 1주일 지난 finished 예약을 expired 처리
-   ============================================================ */
-exports.expireOldReservations = onSchedule("every day 00:00", async () => {
-  const now = Date.now();
-  const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
-
-  console.log("Running expireOldReservations");
-
-  const snapshot = await db.collection("reservations")
-    .where("status", "==", "finished")
-    .where("timestamp", "<", oneWeekAgo)
-    .get();
-
-  if (snapshot.empty) {
-    console.log("No reservations to expire.");
+    await batch.commit();
+    logger.info("finishPastReservations: done");
     return null;
   }
+);
 
-  console.log(`Expiring ${snapshot.size} reservations...`);
+/** 2-2. 매일 00시, finished 후 1주 지난 예약 expired 처리 */
+exports.expireOldReservations = onSchedule(
+  { schedule: "every day 00:00", region: REGION },
+  async () => {
+    const db = admin.firestore();
+    const now = Date.now();
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-  const batch = db.batch();
-  snapshot.forEach(doc => {
-    batch.update(doc.ref, { status: "expired" });
-  });
+    const snapshot = await db
+      .collection("reservations")
+      .where("status", "==", "finished")
+      .where("timestamp", "<", oneWeekAgo)
+      .get();
 
-  await batch.commit();
+    if (snapshot.empty) {
+      logger.info("expireOldReservations: nothing to expire.");
+      return null;
+    }
 
-  console.log("Old reservations expired!");
-  return null;
-});
+    const batch = db.batch();
+    snapshot.forEach((doc) => batch.update(doc.ref, { status: "expired" }));
+    await batch.commit();
 
-// (B) 예약 생성 시 충돌 체크 + 저장 (안드로이드에서 호출)
-exports.createReservation = onCall(async (req) => {
+    logger.info(
+      `expireOldReservations: expired ${snapshot.size} old reservations.`
+    );
+    return null;
+  }
+);
+
+/* ======================================================
+   3. 예약 생성 (충돌 검사 포함)
+   ====================================================== */
+
+exports.createReservation = onCall({ region: REGION }, async (req) => {
   const db = admin.firestore();
 
   const {
@@ -176,18 +177,19 @@ exports.createReservation = onCall(async (req) => {
     day,
     date,
     periodStart,
-    periodEnd
+    periodEnd,
   } = req.data;
 
-  // 1) 충돌(오버랩) 검사
-  const conflict = await db.collection("reservations")
+  // 3-1. 시간 충돌 체크
+  const snap = await db
+    .collection("reservations")
     .where("buildingId", "==", buildingId)
     .where("roomId", "==", roomId)
     .where("date", "==", date)
     .where("status", "==", "approved")
     .get();
 
-  for (const doc of conflict.docs) {
+  for (const doc of snap.docs) {
     const r = doc.data();
     const s = r.periodStart;
     const e = r.periodEnd;
@@ -198,7 +200,7 @@ exports.createReservation = onCall(async (req) => {
     }
   }
 
-  // 2) 충돌 없으면 예약 저장
+  // 3-2. 예약 저장
   const newReservation = {
     userId,
     userName,
@@ -212,9 +214,156 @@ exports.createReservation = onCall(async (req) => {
     periodStart,
     periodEnd,
     timestamp: Date.now(),
-    status: "approved"
+    status: "approved",
   };
 
   await db.collection("reservations").add(newReservation);
   return { success: true };
 });
+
+/* ======================================================
+   4. AI Assistant – 사용 가능한 강의실 조회
+   ====================================================== */
+
+exports.chatbotAvailableRoomsV2 = onCall({ region: REGION }, async (req) => {
+  try {
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || process.env.openai_key || process.env.openai?.key,
+      });
+
+    const { buildingId, buildingName, date, hour } = req.data;
+
+    if (!buildingId) throw new Error("buildingId missing");
+    if (!buildingName) throw new Error("buildingName missing");
+    if (!date) throw new Error("date missing (YYYY-MM-DD)");
+    if (hour === undefined) throw new Error("hour missing (0~23)");
+
+    const db = admin.firestore();
+
+    /* ============================================================
+       1) hour → 교시(period) 변환
+       ============================================================ */
+    function hourToPeriod(h) {
+      return h - 8; // 08:00 = 0, 09:00 = 1 …
+    }
+    const targetPeriod = hourToPeriod(hour);
+
+    /* ============================================================
+       2) date → 요일 변환 (Sun, Mon, Tue …)
+       ============================================================ */
+    function getDayCode(dateStr) {
+      const d = new Date(dateStr);
+      return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+    }
+    const targetDay = getDayCode(date);
+
+
+    /* ============================================================
+       3) timetable 불러오기 (정규 수업)
+       ============================================================ */
+    const buildingDoc = await db
+      .collection("buildings")
+      .doc(buildingId)
+      .get();
+
+    if (!buildingDoc.exists) throw new Error("Building not found");
+
+    const timetable = buildingDoc.get("timetable") ?? {};
+
+
+    /* ============================================================
+       4) 예약 불러오기 (period 기반)
+       ============================================================ */
+    const reservationSnap = await db
+      .collection("reservations")
+      .where("buildingId", "==", buildingId)
+      .where("date", "==", date)
+      .where("status", "==", "approved")
+      .get();
+
+    const reservationEvents = reservationSnap.docs.map((doc) => {
+      const r = doc.data();
+      return {
+        roomId: r.roomId,
+        periodStart: r.periodStart,
+        periodEnd: r.periodEnd,
+      };
+    });
+
+
+    /* ============================================================
+       5) 사용 가능 여부 체크 (period 기준)
+       ============================================================ */
+    function isRoomAvailable(roomId, roomData) {
+      // (A) 정규 수업
+      if (roomData?.schedule) {
+        for (const ev of roomData.schedule) {
+
+          // 요일 다르면 skip
+          if (ev.day !== targetDay) continue;
+
+          // 교시가 겹치면 사용 불가
+          const s = ev.periodStart;
+          const e = ev.periodEnd;
+
+          const overlapped = !(targetPeriod < s || targetPeriod > e);
+          if (overlapped) return false;
+        }
+      }
+
+      // (B) 예약
+      for (const r of reservationEvents) {
+        if (r.roomId !== roomId) continue;
+
+        const s = r.periodStart;
+        const e = r.periodEnd;
+
+        const overlapped = !(targetPeriod < s || targetPeriod > e);
+        if (overlapped) return false;
+      }
+
+      return true;
+    }
+
+
+    /* ============================================================
+       6) 전체 강의실 중 사용 가능한 목록 추출
+       ============================================================ */
+    const availableRooms = Object.entries(timetable)
+      .filter(([roomId, roomData]) => isRoomAvailable(roomId, roomData))
+      .map(([roomId]) => roomId);
+
+    logger.info("Available rooms:", availableRooms);
+
+
+    /* ============================================================
+       7) AI 자연어 응답 생성
+       ============================================================ */
+    const prompt = `
+너는 서울과학기술대학교 강의실 예약 도우미 AI야.
+
+- 날짜: ${date}
+- 시간: ${hour}시
+- 건물: ${buildingName}
+
+해당 시간에 사용 가능한 강의실:
+${availableRooms.length > 0 ? availableRooms.join(", ") : "없음"}
+
+학생이 이해하기 쉽게, 자연스럽고 친절하게 한 문단으로 답변해줘.
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const answer = completion.choices[0].message.content;
+
+    return { ok: true, answer, rooms: availableRooms };
+
+  } catch (err) {
+    logger.error("chatbotAvailableRoomsV2 error:", err);
+    return { ok: false, error: err.message };
+  }
+});
+
