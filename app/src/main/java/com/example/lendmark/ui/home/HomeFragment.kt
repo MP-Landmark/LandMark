@@ -10,7 +10,7 @@ import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.lendmark.R
 import com.example.lendmark.databinding.FragmentHomeBinding
-import com.example.lendmark.ui.chatbot.ChatbotActivity
+import com.example.lendmark.ui.chatbot.ChatBotActivity
 import com.example.lendmark.ui.home.adapter.AnnouncementAdapter
 import com.example.lendmark.ui.home.adapter.FrequentlyUsedRoomsAdapter
 import com.example.lendmark.ui.my.ReservationDetailDialogFS
@@ -54,10 +54,11 @@ class HomeFragment : Fragment() {
         }
 
         binding.ivChatbot.setOnClickListener {
-            val intent = Intent(requireContext(), ChatbotActivity::class.java)
+            val intent = Intent(requireContext(), ChatBotActivity::class.java)
             startActivity(intent)
         }
     }
+
 
     private fun observeViewModel() {
 
