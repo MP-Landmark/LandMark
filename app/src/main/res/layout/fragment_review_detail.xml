@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- 🔹 리뷰 없음 안내 -->
+        <TextView
+            android:id="@+id/tvNoReview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="아직 등록된 리뷰가 없습니다."
+            android:textSize="14sp"
+            android:textColor="#6B7280"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
+        <!-- 🔹 전체 콘텐츠(리뷰 있을 때만 표시됨) -->
+        <LinearLayout
+            android:id="@+id/contentContainer"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <!-- 설명 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="강의실 시설 및 정보"
+                android:layout_marginTop="6dp"
+                android:textColor="#6B7280"
+                android:textSize="14sp" />
+
+            <!-- 기본 정보 카드 -->
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#F6F5FB"
+                android:padding="20dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="20dp"
+                android:clipToPadding="false"
+                android:clipChildren="false"
+                android:radius="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="수용 인원"
+                        android:textColor="#6B7280"
+                        android:textSize="14sp"/>
+
+                    <TextView
+                        android:id="@+id/tvAvgCapacity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="정보없음"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#111111"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="10dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="강의실 규모"
+                        android:textColor="#6B7280"
+                        android:textSize="14sp"/>
+
+                    <TextView
+                        android:id="@+id/tvMajorClassType"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="정보없음"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#111111"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 시설 정보 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="시설 정보"
+                android:textStyle="bold"
+                android:textSize="17sp"
+                android:layout_marginBottom="10dp"/>
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupTags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="8dp" />
+
+            <!-- 포토 리뷰 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="포토 리뷰"
+                android:layout_marginTop="24dp"
+                android:textStyle="bold"
+                android:textSize="17sp"/>
+
+            <!-- 3열 그리드 -->
+            <GridLayout
+                android:id="@+id/photoGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="3"
+                android:alignmentMode="alignMargins"
+                android:rowOrderPreserved="false"
+                android:layout_marginTop="14dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

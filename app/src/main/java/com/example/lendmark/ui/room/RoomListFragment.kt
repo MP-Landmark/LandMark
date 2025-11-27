@@ -63,9 +63,19 @@ class RoomListFragment : Fragment() {
                 )
             },
             onMoreInfoClick = { room ->
-                Toast.makeText(requireContext(),
-                    "${room.name} 정보 보기 클릭됨", Toast.LENGTH_SHORT).show()
+
+                val bundle = Bundle().apply {
+                    putString("buildingId", buildingId)
+                    putString("roomId", room.roomId)
+                    putString("roomTitle", room.name)
+                }
+
+                (requireActivity() as MainActivity).replaceFragment(
+                    ReviewDetailFragment().apply { arguments = bundle },
+                    room.name
+                )
             }
+
         )
 
         binding.rvRoomList.layoutManager = LinearLayoutManager(requireContext())
