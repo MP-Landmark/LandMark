@@ -21,7 +21,7 @@
 
     <!-- Clock Hands -->
     <path
-        android:strokeColor="#190848"
+        android:strokeColor="#E8E7EE"
         android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:pathData="M12,8 L12,12 L15,13" />
