@@ -29,6 +29,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import androidx.activity.viewModels
+import com.example.lendmark.ui.notification.NotificationViewModel
 
 class MainActivity : AppCompatActivity() {
 
@@ -48,9 +50,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvUserEmail: TextView
     private lateinit var imgProfile: ImageView
 
+    //  앱 켜지자마자 알림 비서(ViewModel) 고용! (자동으로 init 실행됨)
+    private val notificationViewModel: NotificationViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        Log.d("MainActivity", "알림 시스템 시작 여부: ${notificationViewModel.isInAppEnabled}")
 
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
