@@ -175,25 +175,42 @@ class ChatBotActivity : AppCompatActivity() {
 
         val today = LocalDate.now().toString()
         val now = LocalTime.now()
-        val nowHour = now.hour
+        val nowHour = now.hour  // 0~23
 
-        val START = 8
-        val END = 18
+        val START = 8   // 예약 가능 시작시간
+        val END = 18    // 예약 가능 종료시간
 
         if (date == today) {
-            if (nowHour < END) {
-                timeList.add("지금 바로")
-
-                var nextHour = nowHour + 1
-                while (nextHour <= END) {
-                    val diff = nextHour - nowHour
-                    timeList.add("${diff}시간 뒤 (${nextHour}시)")
-                    nextHour++
+            when {
+                // 현재 시간이 18시 이후 -> 오늘 예약 불가
+                nowHour >= END -> {
+                    timeList.add("오늘은 예약 가능한 시간이 없습니다.\n강의실 예약은 평일 08시~18시까지만 가능합니다.")
                 }
-            } else {
-                timeList.add("오늘은 예약 가능한 시간이 없습니다. \n강의실 예약은 평일 08시 ~ 18시에만 가능합니다.")
+
+                // 현재 시간이 08:00 이전 → "지금 바로" 금지, 8~18시만 표시
+                nowHour < START -> {
+                    for (h in START..END) {
+                        timeList.add("${h}시")
+                    }
+                }
+
+                //  현재 시간이 08~18시 사이일 때 정상 동작
+                else -> {
+                    // 지금 바로 가능
+                    timeList.add("지금 바로")
+
+                    // 현재 시각 이후부터 18시까지
+                    var nextHour = nowHour + 1
+                    while (nextHour <= END) {
+                        val diff = nextHour - nowHour
+                        timeList.add("${diff}시간 뒤 (${nextHour}시)")
+                        nextHour++
+                    }
+                }
             }
+
         } else {
+            // 오늘이 아닌 경우 전체 8~18시 표시
             for (h in START..END) {
                 timeList.add("${h}시")
             }
@@ -205,6 +222,7 @@ class ChatBotActivity : AppCompatActivity() {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
     }
+
 
 
     private fun loadBuildings() {
